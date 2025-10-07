@@ -1,4 +1,4 @@
-package ot
+package model
 
 // OperationType describes the type of operation
 type OperationType string
@@ -23,4 +23,15 @@ type Delta struct {
 	Version   int         `json:"version"`
 	Ops       []Operation `json:"ops"`
 	Timestamp int64       `json:"timestamp"`
+}
+
+type Cursor struct {
+	ClientID string `json:"client_id"`
+	Position int    `json:"position"`
+	Name     string `json:"name"`
+}
+
+type DeltaWithCursor struct {
+	Delta  Delta  `json:"delta"`
+	Cursor Cursor `json:"cursor"`
 }

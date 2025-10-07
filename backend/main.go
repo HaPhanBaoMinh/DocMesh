@@ -1,17 +1,28 @@
 package main
 
 import (
+	"docmesh/doc_handler"
+	"docmesh/model"
+	"flag"
 	"log"
-	"your-project/internal/ot"
-	"your-project/internal/ws"
+	"net/http"
 )
 
 func main() {
-	doc := ot.NewDocument("doc-001", "Hello World")
-	queue := ot.NewDeltaQueue(100)
+	flag.Parse()
+	hubMgr := model.NewHubManager()
+	docHandler := doc_handler.NewDocumentHandler()
 
-	go ws.StartServer(doc, queue)
+	// Initialize and start your server here, passing hubMgr as needed
+	mux := http.NewServeMux()
+	mux.HandleFunc("/create", docHandler.CreateDocumentHandler(hubMgr))
+	mux.HandleFunc("/ws", docHandler.ServeWs(hubMgr))
 
-	log.Println("Server running at :8080")
-	select {}
+	// Start the server
+	addr := ":8080"
+	log.Printf("listening on %s", addr)
+	err := http.ListenAndServe(addr, mux)
+	if err != nil {
+		log.Fatal("ListenAndServe:", err)
+	}
 }
