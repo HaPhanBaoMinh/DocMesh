@@ -43,9 +43,7 @@ func (dh *DocumentHandler) CreateDocumentHandler(hm *model.HubManager) http.Hand
 		hm.GetOrCreateHub(doc.ID)
 
 		// response
-
 		w.Header().Set("Content-Type", "application/json")
 		w.Write([]byte(docID))
-
 	}
 }
