@@ -1,7 +1,7 @@
 package ws
 
 import (
-	"docmesh/model"
+	"docmesh/internal/model"
 	"log"
 	"net/http"
 )
@@ -14,7 +14,7 @@ func NewWebSocketHandler() *WebSocketHandler {
 	return &WebSocketHandler{}
 }
 
-func wsEntryHandler(hm *model.HubManager) http.HandlerFunc {
+func (h *WebSocketHandler) WsEntryHandler(hm *model.HubManager) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		docID := r.URL.Query().Get("docID")
 
@@ -23,7 +23,7 @@ func wsEntryHandler(hm *model.HubManager) http.HandlerFunc {
 			return
 		}
 
-		hub := hm.GetOrCreate(docID)
+		hub := hm.GetOrCreateHub(docID)
 		wsHandler(hub, w, r)
 	}
 }
