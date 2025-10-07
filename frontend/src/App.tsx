@@ -84,6 +84,8 @@ export default function App() {
 							/>
 							<span>Public</span>
 						</label>
+						{
+							/* 
 						<label className="flex items-center space-x-2">
 							<input
 								type="radio"
@@ -92,6 +94,8 @@ export default function App() {
 							/>
 							<span>Private</span>
 						</label>
+						*/
+						}
 					</div>
 
 					{type === "private" && (
