@@ -1,113 +1,130 @@
-# 🧠 Operational Transformation (OT) – Go Implementation
+# 📝 DocMesh Backend - Real-time Collaborative Editor
 
-This package (`ot`) provides the core data structures for implementing an **Operational Transformation (OT)** system — the foundation of real-time collaborative editing (e.g., Google Docs).
-
-It defines how text operations (insert, delete, retain) are represented, grouped into transactions (deltas), and later applied or transformed.
+A Go-based backend server implementing **Operational Transformation (OT)** for real-time collaborative document editing, similar to Google Docs.
 
 ---
 
-## 📦 Package Structure
+## 🚀 Features
+
+- ✅ **Real-time collaboration** via WebSocket
+- ✅ **Operational Transformation (OT)** for conflict-free concurrent editing
+- ✅ **Multi-document support** with document management
+- ✅ **Cursor tracking** for all connected users
+- ✅ **Version control** to maintain document consistency
+- ✅ **Scalable architecture** with hub-based client management
+
+---
+
+## 📦 Project Structure
 
 ```
-/internal/ot/
-├── operation.go   # Defines OperationType, Operation, Delta
-├── document.go    # Defines Document struct and Apply function
-├── cursor.go      # Cursor struct and logic for position adjustment
-├── transform.go   # (Future) Logic to transform concurrent deltas
-├── queue.go       # Simple channel-based DeltaQueue
-└── utils.go       # Optional helper functions
+backend/
+├── main.go                          # Application entry point
+├── go.mod                           # Go module dependencies
+├── go.sum                           # Dependency checksums
+│
+├── internal/
+│   ├── api/
+│   │   └── doc_handler/             # HTTP handlers for document management
+│   │       ├── document_handler.go  # Create/list/get documents
+│   │       └── utils.go             # Helper functions
+│   │
+│   ├── model/                       # Core data structures
+│   │   ├── client.go                # Client connection model
+│   │   ├── document.go              # Document structure
+│   │   ├── hub.go                   # Hub for managing clients per document
+│   │   ├── hub_manager.go           # Manager for all document hubs
+│   │   └── operation.go             # OT operations (Delta, Cursor)
+│   │
+│   ├── ws/                          # WebSocket communication
+│   │   └── handler.go               # WebSocket connection handler
+│   │
+│   └── storage/                     # (Future) Persistent storage layer
+│
+└── pkg/                             # (Optional) Shared utilities
 ```
+
+---
+
+## 🏗️ Architecture
+
+### **Hub-based Architecture**
+
+```
+┌─────────────────────────────────────────────────┐
+│              HubManager                         │
+│  Manages multiple documents                     │
+│  ┌────────────┐  ┌────────────┐  ┌────────────┐ │
+│  │  Hub       │  │  Hub       │  │  Hub       │ │
+│  │  (Doc A)   │  │  (Doc B)   │  │  (Doc C)   │ │
+│  │            │  │            │  │            │ │
+│  │  Clients:  │  │  Clients:  │  │  Clients:  │ │
+│  │  - User1   │  │  - User3   │  │  - User5   │ │
+│  │  - User2   │  │  - User4   │  │            │ │
+│  └────────────┘  └────────────┘  └────────────┘ │
+└─────────────────────────────────────────────────┘
+```
+
+Each document has its own **Hub** that:
+- Manages connected clients
+- Broadcasts operations to all clients
+- Maintains document state and version
+- Handles cursor updates
 
 ---
 
 ## ⚙️ Core Data Structures
 
-### 1. `OperationType`
+### 1. **Operation**
+
+Represents a single text edit action.
+
 ```go
 type OperationType string
 
 const (
-	OpInsert OperationType = "insert"
-	OpDelete OperationType = "delete"
-	OpRetain OperationType = "retain"
+    OpInsert OperationType = "insert"
+    OpDelete OperationType = "delete"
+    OpRetain OperationType = "retain"
 )
-```
 
-**Purpose:**  
-Defines the **type of text manipulation** a user performs.
-
-| Type | Description | Example |
-|------|--------------|----------|
-| `insert` | Insert new text into the document | Add `"abc"` at position 10 |
-| `delete` | Remove a specific range of text | Delete 5 chars starting at position 20 |
-| `retain` | Skip over part of the document without modification | Keep 10 chars unchanged before next op |
-
----
-
-### 2. `Operation`
-```go
 type Operation struct {
-	Type   OperationType `json:"type"`
-	Pos    int            `json:"pos"`
-	Length int            `json:"length"`
-	Text   string         `json:"text"`
+    Type   OperationType `json:"type"`    // insert, delete, retain
+    Pos    int           `json:"pos"`     // starting position
+    Length int           `json:"length"`  // for delete/retain
+    Text   string        `json:"text"`    // for insert
 }
 ```
 
-**Purpose:**  
-Represents a single, atomic edit action within a document.  
-
-**Fields Explained:**
-
-| Field | Description | Used For |
-|--------|-------------|----------|
-| `Type` | The operation type (`insert`, `delete`, or `retain`) | All |
-| `Pos` | The zero-based starting position of the operation | All |
-| `Length` | Number of characters affected | Only for `delete` or `retain` |
-| `Text` | Text content being inserted | Only for `insert` |
-
-**Example JSON:**
-
+**Examples:**
 ```json
 { "type": "insert", "pos": 5, "text": "Hello" }
 { "type": "delete", "pos": 10, "length": 3 }
+{ "type": "retain", "pos": 0, "length": 5 }
 ```
 
 ---
 
-### 3. `Delta`
+### 2. **Delta**
+
+A transaction containing multiple operations.
+
 ```go
 type Delta struct {
-	ClientID  string       `json:"client_id"`
-	Version   int          `json:"version"`
-	Ops       []Operation  `json:"ops"`
-	Timestamp int64        `json:"timestamp"`
+    ClientID  string      `json:"client_id"`
+    Version   int         `json:"version"`
+    Ops       []Operation `json:"ops"`
+    Timestamp int64       `json:"timestamp"`
 }
 ```
 
-**Purpose:**  
-A `Delta` groups multiple `Operation`s into a **logical transaction**.  
-It represents one batch of changes a client sends to the server.
-
-**Fields Explained:**
-
-| Field | Description | Example |
-|--------|-------------|----------|
-| `ClientID` | Unique identifier for the client/user who made the change | `"client_123"` |
-| `Version` | Version of the document at the time of the edit | `12` |
-| `Ops` | List of individual operations that make up the delta | `[OpInsert, OpDelete]` |
-| `Timestamp` | Time (UNIX epoch) when the delta was created | `1738889400` |
-
-**Example JSON:**
-
+**Example:**
 ```json
 {
-  "client_id": "userA",
-  "version": 12,
+  "client_id": "user123",
+  "version": 5,
   "ops": [
-    { "type": "insert", "pos": 10, "text": "hi" },
-    { "type": "delete", "pos": 15, "length": 3 },
-    { "type": "retain", "pos": 20, "length": 5 }
+    { "type": "insert", "pos": 10, "text": "world" }
   ],
   "timestamp": 1738889400
 }
@@ -115,127 +132,358 @@ It represents one batch of changes a client sends to the server.
 
 ---
 
-## 🧩 Relationship between Structs
+### 3. **Cursor**
 
-```
-Delta
- ├── ClientID: "userA"
- ├── Version: 12
- └── Ops:
-      ├── { Type: insert, Pos: 10, Text: "hi" }
-      ├── { Type: delete, Pos: 15, Length: 3 }
-      └── { Type: retain, Pos: 20, Length: 5 }
-```
-
-👉 This means:  
-At document version 12, userA inserted “hi” at position 10,  
-deleted 3 characters at position 15,  
-and retained 5 characters after that.
-
----
-
-## 🧠 How It Works (Simplified Flow)
-
-1. **Client Edit → Delta Creation**  
-   - User types or deletes text.  
-   - Client batches these edits into a `Delta`.
-
-2. **Send to Server Queue**  
-   - Server receives the delta and pushes it into a queue.
-
-3. **Apply Delta to Document**  
-   - Server applies the operations in sequence.  
-   - Document version increases by 1.
-
-4. **Broadcast Update to All Clients**  
-   - Updated document content and version are sent to all other clients.  
-   - Clients adjust their cursors accordingly.
-
----
-
-## 🖱️ Cursor Tracking (Next Step)
-
-Each user’s cursor position can also be tracked and updated when applying deltas.
-
-Example struct:
+Tracks user cursor position.
 
 ```go
 type Cursor struct {
-	ClientID string `json:"client_id"`
-	Pos      int    `json:"pos"`
-	Anchor   int    `json:"anchor"`
-	Color    string `json:"color"`
+    ClientID string `json:"client_id"`
+    Position int    `json:"position"`
+    Name     string `json:"name"`
 }
 ```
 
-When an operation is applied:
-- If text is inserted before the cursor → move cursor forward.  
-- If text is deleted before the cursor → move cursor backward.
+---
 
-Example update logic:
+### 4. **Document**
+
+Represents a collaborative document.
+
 ```go
-func UpdateCursor(cursor *Cursor, op Operation) {
-	switch op.Type {
-	case OpInsert:
-		if op.Pos <= cursor.Pos {
-			cursor.Pos += len([]rune(op.Text))
-		}
-	case OpDelete:
-		if op.Pos < cursor.Pos {
-			cursor.Pos -= min(cursor.Pos - op.Pos, op.Length)
-		}
-	}
+type Document struct {
+    ID      string `json:"id"`
+    Content string `json:"content"`
+    Version int    `json:"version"`
+    Name    string `json:"name"`
 }
 ```
 
 ---
 
-## 🔁 Queueing and Version Control
+## 🔌 API Endpoints
 
-Each `Delta` can be queued before being applied to the document.
+### **HTTP Endpoints**
 
-Example:
+#### 1. Create Document
+```http
+POST /create
+Content-Type: application/json
+
+{
+  "name": "My Document",
+  "content": "Initial content"
+}
+
+Response:
+{
+  "id": "550e8400-e29b-41d4-a716-446655440000",
+  "name": "My Document",
+  "content": "Initial content",
+  "version": 0
+}
+```
+
+---
+
+### **WebSocket Endpoint**
+
+#### Connect to Document
+```
+ws://localhost:8080/ws?docId=<document-id>&clientId=<client-id>&clientName=<name>
+```
+
+**Query Parameters:**
+- `docId`: Document ID to connect to
+- `clientId`: Unique client identifier (UUID)
+- `clientName`: Display name for the user
+
+---
+
+## 📡 WebSocket Message Protocol
+
+### **Client → Server**
+
+#### 1. Operation Message
+```json
+{
+  "type": "operation",
+  "delta": {
+    "client_id": "user123",
+    "version": 5,
+    "ops": [
+      { "type": "insert", "pos": 10, "text": "Hello" }
+    ],
+    "timestamp": 1738889400
+  },
+  "cursor": {
+    "client_id": "user123",
+    "position": 15,
+    "name": "Alice"
+  }
+}
+```
+
+#### 2. Cursor Update
+```json
+{
+  "type": "cursor",
+  "cursor": {
+    "client_id": "user123",
+    "position": 20,
+    "name": "Alice"
+  }
+}
+```
+
+---
+
+### **Server → Client**
+
+#### 1. Initial State
+```json
+{
+  "type": "init",
+  "document": {
+    "id": "doc123",
+    "content": "Hello World",
+    "version": 5,
+    "name": "My Document"
+  },
+  "clients": [
+    { "client_id": "user1", "position": 5, "name": "Alice" },
+    { "client_id": "user2", "position": 10, "name": "Bob" }
+  ]
+}
+```
+
+#### 2. Broadcast Operation
+```json
+{
+  "type": "operation",
+  "delta": { /* ... */ },
+  "cursor": { /* ... */ }
+}
+```
+
+#### 3. Broadcast Cursor
+```json
+{
+  "type": "cursor",
+  "cursor": {
+    "client_id": "user123",
+    "position": 25,
+    "name": "Alice"
+  }
+}
+```
+
+---
+
+## 🔧 Installation & Setup
+
+### **Prerequisites**
+- Go 1.22 or higher
+- Git
+
+### **Install Dependencies**
+```bash
+cd backend
+go mod download
+```
+
+### **Run the Server**
+```bash
+go run main.go
+```
+
+The server will start on `http://localhost:8080`
+
+---
+
+## 🧪 Testing
+
+### **Health Check**
+```bash
+curl http://localhost:8080/health
+```
+
+### **Create a Document**
+```bash
+curl -X POST http://localhost:8080/create \
+  -H "Content-Type: application/json" \
+  -d '{"name": "Test Doc", "content": "Hello World"}'
+```
+
+### **Connect via WebSocket**
+```javascript
+const ws = new WebSocket('ws://localhost:8080/ws?docId=<id>&clientId=<uuid>&clientName=Alice');
+
+ws.onmessage = (event) => {
+  const msg = JSON.parse(event.data);
+  console.log('Received:', msg);
+};
+
+// Send operation
+ws.send(JSON.stringify({
+  type: 'operation',
+  delta: {
+    client_id: 'user123',
+    version: 1,
+    ops: [{ type: 'insert', pos: 0, text: 'Hello' }],
+    timestamp: Date.now()
+  },
+  cursor: { client_id: 'user123', position: 5, name: 'Alice' }
+}));
+```
+
+---
+
+## 🔄 Operational Transformation Flow
+
+```
+1. User types text
+   ↓
+2. Client creates Delta with Operations
+   ↓
+3. Client sends Delta to Server via WebSocket
+   ↓
+4. Server receives Delta
+   ↓
+5. Server applies Delta to Document
+   ↓
+6. Document version increments
+   ↓
+7. Server broadcasts Delta to all other clients
+   ↓
+8. Clients receive Delta and update their local state
+   ↓
+9. Clients adjust their cursors based on operations
+```
+
+---
+
+## 🖱️ Cursor Adjustment Algorithm
+
+When an operation is applied, all other users' cursors are adjusted:
+
+### **Insert Operation**
+```
+Original text: "Hello World"
+                     ^
+                  cursor at 11
+
+Insert " Beautiful" at position 6:
+Result: "Hello Beautiful World"
+                         ^
+                    cursor at 21 (+10)
+```
+
+### **Delete Operation**
+```
+Original text: "Hello Beautiful World"
+                         ^
+                    cursor at 21
+
+Delete 10 chars at position 6:
+Result: "Hello World"
+             ^
+        cursor at 11 (-10)
+```
+
+---
+
+## 📚 Key Components Explained
+
+### **HubManager**
+- Manages multiple document hubs
+- Creates new hubs for new documents
+- Routes WebSocket connections to appropriate hubs
+
+### **Hub**
+- One hub per document
+- Manages all clients connected to that document
+- Broadcasts operations and cursor updates
+- Maintains document state
+
+### **Client**
+- Represents a WebSocket connection
+- Stores client metadata (ID, name, cursor position)
+- Handles message sending/receiving
+
+### **DocumentHandler**
+- HTTP handlers for document CRUD operations
+- Creates new documents
+- Retrieves document list/details
+
+### **WebSocketHandler**
+- Upgrades HTTP connections to WebSocket
+- Routes connections to appropriate hub
+- Handles WebSocket message protocol
+
+---
+
+## 🔮 Future Enhancements
+
+- [ ] **Persistent Storage** (PostgreSQL/Redis)
+- [ ] **Authentication & Authorization**
+- [ ] **Document permissions** (public/private/shared)
+- [ ] **Operation history** for undo/redo
+- [ ] **Advanced OT Transform** for complex conflicts
+- [ ] **Rich text support** (bold, italic, links)
+- [ ] **Comments and annotations**
+- [ ] **Presence indicators** (typing status)
+- [ ] **Document search**
+- [ ] **Export to PDF/DOCX**
+
+---
+
+## 📄 Dependencies
+
 ```go
-type DeltaQueue struct {
-	Queue chan Delta
-}
-
-func NewDeltaQueue(size int) *DeltaQueue {
-	return &DeltaQueue{
-		Queue: make(chan Delta, size),
-	}
-}
-
-func (dq *DeltaQueue) Push(delta Delta) {
-	dq.Queue <- delta
-}
+require (
+    github.com/gorilla/websocket v1.5.3  // WebSocket support
+    github.com/google/uuid v1.6.0        // UUID generation
+)
 ```
 
-A background goroutine reads from the queue and sequentially applies each delta to maintain consistency.
+---
+
+## 🐛 Troubleshooting
+
+### **WebSocket connection fails**
+- Ensure server is running on port 8080
+- Check firewall settings
+- Verify CORS settings in WebSocket upgrader
+
+### **Operations not applying**
+- Check document version matching
+- Verify operation format (valid JSON)
+- Ensure client is properly connected
+
+### **Cursor positions incorrect**
+- Verify operation positions are correct
+- Check cursor adjustment logic
+- Ensure operations are applied in order
 
 ---
 
-## 📘 Next Extensions
+## 👨‍💻 Development
 
-- **`Document` struct** → store content and version  
-- **`Apply(delta)`** → modify content using operations  
-- **`Transform(a, b)`** → resolve concurrent edits  
-- **`Cursor synchronization`** → update cursor across clients  
-- **`WebSocket integration`** → real-time communication  
+### **Code Style**
+- Follow Go conventions
+- Use `gofmt` for formatting
+- Add comments for exported functions
 
----
-
-## 🧾 Summary
-
-| Concept | Description |
-|----------|-------------|
-| **Operation** | The smallest unit of change (insert/delete/retain). |
-| **Delta** | A collection of operations representing one user action. |
-| **Version** | Keeps the document consistent between clients and server. |
-| **Queue** | Ensures ordered application of changes. |
-| **Cursor** | Tracks and adjusts user positions dynamically. |
+### **Project Layout**
+Follows [Standard Go Project Layout](https://github.com/golang-standards/project-layout)
 
 ---
 
-### 📄 Author
-This implementation is part of the **Operational Transformation model in Go**, built for a real-time collaborative web editor project (Google Docs–like architecture).
+## 📧 Contact
+
+For questions or contributions, please open an issue on GitHub.
+
+---
+
+**Built with ❤️ using Go and Operational Transformation**
