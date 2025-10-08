@@ -1,6 +1,7 @@
 package model
 
 import (
+	"log"
 	"sync"
 )
 
@@ -38,6 +39,7 @@ func (hm *HubManager) GetOrCreateHub(docID string) *Hub {
 	// Create a new hub if it doesn't exist
 	newHub := NewHub(Document{ID: docID, Content: "", Version: 0})
 	hm.Hubs[docID] = newHub
+	log.Printf("Created hub for document: %s", docID)
 	return newHub
 }
 

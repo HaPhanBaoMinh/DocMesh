@@ -35,7 +35,7 @@ export interface Cursor {
 export interface CreateDocumentRequest {
   name: string;
   content?: string;
-  type: "public" | "private";
+  type?: "public" | "private";
   password?: string;
 }
 
