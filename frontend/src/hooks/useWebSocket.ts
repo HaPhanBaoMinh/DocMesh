@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
-import type { Delta, Cursor, Document } from '../services/api';
+import type { Delta, Cursor, Document, Client } from '../model/types';
 
 // WebSocket message types
 export interface WSMessage {
@@ -7,12 +7,12 @@ export interface WSMessage {
   document?: Document;
   delta?: Delta;
   cursor?: Cursor;
-  clients?: Cursor[];
+  client?: Client;
   error?: string;
 }
 
 export interface UseWebSocketOptions {
-  url: string;
+  url: string;    
   onMessage?: (message: WSMessage) => void;
   onOpen?: () => void;
   onClose?: () => void;
@@ -24,7 +24,7 @@ export interface UseWebSocketOptions {
 
 export interface UseWebSocketReturn {
   sendMessage: (message: any) => void;
-  sendOperation: (delta: Delta, cursor?: Cursor) => void;
+  sendOperationTransaction: (delta: Delta, cursor?: Cursor) => void;
   sendCursor: (cursor: Cursor) => void;
   isConnected: boolean;
   isConnecting: boolean;
@@ -134,7 +134,7 @@ export function useWebSocket({
     setIsConnected(false);
   }, []);
 
-  const sendMessage = useCallback((message: any) => {
+  const sendMessage = useCallback((message: WSMessage) => {
     if (wsRef.current?.readyState === WebSocket.OPEN) {
       wsRef.current.send(JSON.stringify(message));
     } else {
@@ -143,9 +143,9 @@ export function useWebSocket({
     }
   }, []);
 
-  const sendOperation = useCallback(
+  const sendOperationTransaction = useCallback(
     (delta: Delta, cursor?: Cursor) => {
-      const message: any = {
+      const message: WSMessage = {
         type: 'operation',
         delta,
       };
@@ -159,7 +159,7 @@ export function useWebSocket({
 
   const sendCursor = useCallback(
     (cursor: Cursor) => {
-      const message = {
+      const message: WSMessage = {
         type: 'cursor',
         cursor,
       };
@@ -180,7 +180,7 @@ export function useWebSocket({
 
   return {
     sendMessage,
-    sendOperation,
+    sendOperationTransaction,
     sendCursor,
     isConnected,
     isConnecting,
