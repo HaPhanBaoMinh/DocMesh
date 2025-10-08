@@ -2,6 +2,7 @@ import { useState } from "react";
 import UserNameStep from "./components/UserNameStep";
 import CreateDocumentStep from "./components/CreateDocumentStep";
 import EditorView from "./components/EditorView";
+import { useCreateDocument } from "./hooks/useApi";
 
 interface Doc {
 	title: string;
@@ -15,13 +16,29 @@ export default function App() {
 	const [doc, setDoc] = useState<Doc | null>(null);
 	const [text, setText] = useState("");
 	const [rev, setRev] = useState(0);
+	const { createDocument, isLoading, error, data, reset } = useCreateDocument();
 
 	const [title, setTitle] = useState("");
 	const [type, setType] = useState<"public" | "private">("public");
 	const [password, setPassword] = useState("");
 
-	function handleCreateDoc() {
-		setDoc({ title, type, password });
+	async function handleCreateDoc() {
+		reset();
+		try {
+			const response = await createDocument({
+				name: title,
+				content: "",
+				type,
+				password,
+			});
+			setDoc({ title, type, password });
+			setText(response.content);
+			setRev(response.version);
+		} catch (error) {
+			console.error("Failed to create document. Please try again.");
+		} finally {
+			reset();
+		}
 		setStep("editor");
 	}
 
@@ -58,7 +75,17 @@ export default function App() {
 		);
 	}
 
-	// ========== STEP 3: Editor ==========
+	// ========== STEP 3: Loading ==========
+	if (isLoading) {
+		return (
+			<div>
+				<h1>Loading...</h1>
+				<p>{error}</p>
+			</div>
+		);
+	}
+
+	// ========== STEP 4: Editor ==========
 	if (step === "editor" && doc) {
 		return (
 			<EditorView
