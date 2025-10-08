@@ -45,4 +45,3 @@ export interface CreateDocumentResponse {
   content: string;
   version: number;
 }
-

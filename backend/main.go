@@ -2,6 +2,7 @@ package main
 
 import (
 	"docmesh/internal/api/doc_handler"
+	"docmesh/internal/middleware"
 	"docmesh/internal/model"
 	"docmesh/internal/ws"
 	"flag"
@@ -19,11 +20,18 @@ func main() {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/create", docHandler.CreateDocumentHandler(hubMgr))
 	mux.HandleFunc("/ws", wsHandler.WsEntryHandler(hubMgr))
+	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("OK"))
+	})
+
+	// Wrap with CORS middleware
+	handler := middleware.CORSMiddleware(mux)
 
 	// Start the server
 	addr := ":8080"
-	log.Printf("listening on %s", addr)
-	err := http.ListenAndServe(addr, mux)
+	log.Printf("Server listening on %s", addr)
+	err := http.ListenAndServe(addr, handler)
 	if err != nil {
 		log.Fatal("ListenAndServe:", err)
 	}
