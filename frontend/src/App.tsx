@@ -26,14 +26,14 @@ export default function App() {
 	async function handleCreateDoc() {
 		// reset();
 		try {
-			// const response = await createDocument({
-			// 	name: title,
-			// 	content: "",
-			// 	type,
-			// 	password,
-			// });
-			// setText(response.content);
-			// setRev(response.version);
+			const response = await createDocument({
+				name: title,
+				content: "",
+				type,
+				password,
+			});
+			setText(response.content);
+			setRev(response.version);
 			setDoc({ title, type, password, id: data?.id });
 		} catch (error) {
 			console.error("Failed to create document. Please try again.");

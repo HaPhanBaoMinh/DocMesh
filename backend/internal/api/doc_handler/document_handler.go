@@ -35,10 +35,13 @@ func (dh *DocumentHandler) CreateDocumentHandler(hm *model.HubManager) http.Hand
 		}
 
 		// create a new document
+
 		docID := GenerateID()
 		doc := &model.Document{
-			ID:   docID,
-			Name: name,
+			ID:      docID,
+			Name:    name,
+			Content: "",
+			Version: 0,
 		}
 		hm.GetOrCreateHub(doc.ID)
 
