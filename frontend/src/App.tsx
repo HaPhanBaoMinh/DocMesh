@@ -8,6 +8,7 @@ interface Doc {
 	title: string;
 	type: "public" | "private";
 	password?: string;
+	id?: string;
 }
 
 export default function App() {
@@ -23,28 +24,29 @@ export default function App() {
 	const [password, setPassword] = useState("");
 
 	async function handleCreateDoc() {
-		reset();
+		// reset();
 		try {
-			const response = await createDocument({
-				name: title,
-				content: "",
-				type,
-				password,
-			});
-			setDoc({ title, type, password });
-			setText(response.content);
-			setRev(response.version);
+			// const response = await createDocument({
+			// 	name: title,
+			// 	content: "",
+			// 	type,
+			// 	password,
+			// });
+			// setText(response.content);
+			// setRev(response.version);
+			setDoc({ title, type, password, id: data?.id });
 		} catch (error) {
 			console.error("Failed to create document. Please try again.");
 		} finally {
-			reset();
+			// reset();
 		}
 		setStep("editor");
 	}
 
 	function handleCopyLink() {
 		if (!doc) return;
-		const link = `${window.location.origin}/docs/${encodeURIComponent(doc.title)}`;
+		if (!doc.id) return;
+		const link = `${window.location.origin}/docs/${encodeURIComponent(doc.id)}`;
 		navigator.clipboard.writeText(link);
 		alert("Link copied!");
 	}
