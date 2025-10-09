@@ -50,6 +50,19 @@ export function useWebSocket({
   const [error, setError] = useState<string | null>(null);
   const [reconnectAttempts, setReconnectAttempts] = useState(0);
   const shouldReconnectRef = useRef(true);
+  
+  // Store callbacks in refs to avoid recreating connect function
+  const onMessageRef = useRef(onMessage);
+  const onOpenRef = useRef(onOpen);
+  const onCloseRef = useRef(onClose);
+  const onErrorRef = useRef(onError);
+  
+  useEffect(() => {
+    onMessageRef.current = onMessage;
+    onOpenRef.current = onOpen;
+    onCloseRef.current = onClose;
+    onErrorRef.current = onError;
+  });
 
   const connect = useCallback(() => {
     if (!url || wsRef.current?.readyState === WebSocket.OPEN) {
@@ -68,14 +81,14 @@ export function useWebSocket({
         setIsConnecting(false);
         setReconnectAttempts(0);
         setError(null);
-        onOpen?.();
+        onOpenRef.current?.();
       };
 
       ws.onmessage = (event) => {
         try {
           const message: WSMessage = JSON.parse(event.data);
           console.log('WebSocket message received:', message);
-          onMessage?.(message);
+          onMessageRef.current?.(message);
         } catch (err) {
           console.error('Failed to parse WebSocket message:', err);
           setError('Failed to parse message from server');
@@ -85,7 +98,7 @@ export function useWebSocket({
       ws.onerror = (event) => {
         console.error('WebSocket error:', event);
         setError('WebSocket connection error');
-        onError?.(event);
+        onErrorRef.current?.(event);
       };
 
       ws.onclose = () => {
@@ -93,7 +106,7 @@ export function useWebSocket({
         setIsConnected(false);
         setIsConnecting(false);
         wsRef.current = null;
-        onClose?.();
+        onCloseRef.current?.();
 
         // Auto-reconnect logic
         if (
@@ -119,7 +132,7 @@ export function useWebSocket({
       setError('Failed to create WebSocket connection');
       setIsConnecting(false);
     }
-  }, [url, onMessage, onOpen, onClose, onError, autoReconnect, reconnectInterval, maxReconnectAttempts, reconnectAttempts]);
+  }, [url, autoReconnect, reconnectInterval, maxReconnectAttempts, reconnectAttempts]);
 
   const disconnect = useCallback(() => {
     shouldReconnectRef.current = false;

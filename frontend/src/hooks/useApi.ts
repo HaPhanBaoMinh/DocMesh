@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import type { CreateDocumentRequest, CreateDocumentResponse } from '../model/types';
 
 // API configuration
@@ -98,14 +98,13 @@ export function useHealthCheck() {
  * This is a utility hook that doesn't make API calls
  */
 export function useWebSocketUrl() {
-  const getWebSocketUrl = useCallback((docId: string, clientId: string, clientName: string): string => {
+  const getWebSocketUrl = useCallback((docId: string, clientId: string): string => {
     const wsProtocol = API_BASE_URL.startsWith('https') ? 'wss' : 'ws';
     const wsBaseUrl = API_BASE_URL.replace(/^https?/, wsProtocol);
     
     const params = new URLSearchParams({
       docId,
       clientId,
-      clientName,
     });
 
     return `${wsBaseUrl}/ws?${params.toString()}`;
@@ -120,6 +119,56 @@ export function useWebSocketUrl() {
 export function useApiConfig() {
   return {
     baseUrl: API_BASE_URL,
+  };
+}
+
+/**
+ * Hook for getting document by ID
+ */
+export function useGetDocument(docId: string) {
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [document, setDocument] = useState<CreateDocumentResponse | null>(null);
+
+  const fetchDocument = useCallback(async () => {
+    if (!docId) return;
+
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/document?id=${docId}`);
+      
+      if (response.status === 404) {
+        throw new Error('Document not found (404)');
+      }
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const doc: CreateDocumentResponse = await response.json();
+      setDocument(doc);
+      return doc;
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to fetch document';
+      setError(errorMessage);
+      console.error('Error fetching document:', err);
+      return null;
+    } finally {
+      setIsLoading(false);
+    }
+  }, [docId]);
+
+  useEffect(() => {
+    fetchDocument();
+  }, [fetchDocument]);
+
+  return {
+    document,
+    isLoading,
+    error,
+    refetch: fetchDocument,
   };
 }
 

@@ -15,6 +15,55 @@ func NewDocumentHandler() *DocumentHandler {
 	return &DocumentHandler{}
 }
 
+func (dh *DocumentHandler) GetDocumentHandler(hm *model.HubManager) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		// Only accept GET requests
+		if r.Method != http.MethodGet {
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+
+		// Get docId from query params
+		docID := r.URL.Query().Get("id")
+		if docID == "" {
+			http.Error(w, "missing document id", http.StatusBadRequest)
+			return
+		}
+
+		// Check if hub exists (document was created)
+		hub, exists := hm.GetHub(docID)
+		if !exists {
+			log.Printf("Document not found: %s", docID)
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusNotFound)
+			json.NewEncoder(w).Encode(map[string]string{
+				"error": "Document not found",
+			})
+			return
+		}
+
+		doc := hub.Document
+
+		// Prepare response
+		response := struct {
+			ID      string `json:"id"`
+			Name    string `json:"name"`
+			Content string `json:"content"`
+			Version int    `json:"version"`
+		}{
+			ID:      doc.ID,
+			Name:    doc.Name,
+			Content: doc.Content,
+			Version: doc.Version,
+		}
+
+		// Send JSON response
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(response)
+	}
+}
+
 func (dh *DocumentHandler) CreateDocumentHandler(hm *model.HubManager) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Only accept POST requests

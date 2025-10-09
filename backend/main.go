@@ -19,6 +19,7 @@ func main() {
 	// Initialize and start your server here, passing hubMgr as needed
 	mux := http.NewServeMux()
 	mux.HandleFunc("/create", docHandler.CreateDocumentHandler(hubMgr))
+	mux.HandleFunc("/document", docHandler.GetDocumentHandler(hubMgr))
 	mux.HandleFunc("/ws", wsHandler.WsEntryHandler(hubMgr))
 	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)

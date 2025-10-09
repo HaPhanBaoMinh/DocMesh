@@ -16,6 +16,13 @@ func NewHubManager() *HubManager {
 	}
 }
 
+func (hm *HubManager) GetHub(docID string) (*Hub, bool) {
+	hm.mu.RLock()
+	defer hm.mu.RUnlock()
+	h, ok := hm.Hubs[docID]
+	return h, ok
+}
+
 func (hm *HubManager) GetOrCreateHub(docID string) *Hub {
 	// Lock for reading first (use RLock for read-only access)
 	hm.mu.RLock()
