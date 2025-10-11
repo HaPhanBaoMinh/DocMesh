@@ -44,7 +44,8 @@ func (hm *HubManager) GetOrCreateHub(docID, docName string) *Hub {
 	}
 
 	// Create a new hub if it doesn't exist
-	newHub := NewHub(Document{ID: docID, Content: "", Version: 0, Name: docName})
+	doc := NewDocument(docID, docName, "", 0)
+	newHub := NewHub(doc)
 	hm.Hubs[docID] = newHub
 	go newHub.Run()
 	log.Printf("Created hub for document: %s", docID)

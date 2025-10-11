@@ -21,7 +21,7 @@ export default function DocumentPage() {
 	const state = location.state as LocationState;
 
 	// Fetch document from server
-	const { document, isLoading: isLoadingDoc, error: docError } = useGetDocument(docId || '');
+	const { document, isLoading: isLoadingDoc, error: docError, refetch } = useGetDocument(docId || '');
 
 	// Get data from location state or from fetched document
 	const [user, setUser] = useState<string | null>(state?.userName || null);
@@ -67,6 +67,7 @@ export default function DocumentPage() {
 		if (!docId) {
 			navigate('/');
 		}
+		refetch(docId || '');
 	}, [docId, navigate]);
 
 	if (!docId) {

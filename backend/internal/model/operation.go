@@ -19,10 +19,10 @@ type Operation struct {
 
 // Delta is a list of operations that form a logical transaction
 type Delta struct {
-	ClientID  string      `json:"client_id"`
-	Version   int         `json:"version"`
-	Ops       []Operation `json:"ops"`
-	Timestamp int64       `json:"timestamp"`
+	ClientID    string      `json:"client_id"`
+	BaseVersion int         `json:"version"`
+	Ops         []Operation `json:"ops"`
+	Timestamp   int64       `json:"timestamp"`
 }
 
 type Cursor struct {

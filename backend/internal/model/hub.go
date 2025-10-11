@@ -1,16 +1,19 @@
 package model
 
-import "log"
+import (
+	"encoding/json"
+	"log"
+)
 
 type Hub struct {
 	Clients    map[string]*Client
 	Broadcast  chan []byte
 	Register   chan *Client
 	Unregister chan *Client
-	Document   Document
+	Document   *Document
 }
 
-func NewHub(doc Document) *Hub {
+func NewHub(doc *Document) *Hub {
 	return &Hub{
 		Clients:    make(map[string]*Client),
 		Broadcast:  make(chan []byte),
@@ -36,15 +39,53 @@ func (h *Hub) Run() {
 			}
 
 		case message := <-h.Broadcast:
-			// 🔁 Broadcast to all clients
-			for _, client := range h.Clients {
-				select {
-				case client.Send <- message:
-				default:
-					// If the send buffer is full, remove the client
-					close(client.Send)
-					delete(h.Clients, client.ID)
+			var base struct {
+				Type   string  `json:"type"`
+				Delta  *Delta  `json:"delta"`
+				Cursor *Cursor `json:"cursor"`
+			}
+
+			if err := json.Unmarshal(message, &base); err != nil {
+				log.Printf("Invalid message format: %v", err)
+				continue
+			}
+
+			log.Printf("Message type: %s", base.Type)
+			switch base.Type {
+			case "operation":
+				log.Printf("Parsed base: %+v", base)
+
+				err := h.Document.ApplyDelta(*base.Delta)
+				if err != nil {
+					log.Printf("ApplyDelta failed: %v", err)
+				} else {
+					log.Printf("Document after applying delta: %s", h.Document.ToString())
 				}
+
+				log.Printf("Broadcast operation from client %s: %+v", base.Delta.ClientID, base.Delta)
+				base.Delta.BaseVersion = h.Document.Version
+
+				// broadcast to all clients
+				for _, c := range h.Clients {
+					if c.ID != base.Delta.ClientID {
+						payload, err := json.Marshal(base)
+						if err != nil {
+							log.Printf("Failed to marshal operation: %v", err)
+							continue
+						}
+
+						select {
+						case c.Send <- payload:
+							log.Printf("📤 Sent update to client %s", c.ID)
+						default:
+							close(c.Send)
+							delete(h.Clients, c.ID)
+						}
+					}
+				}
+
+			default:
+				log.Printf("Unknown message type: %s", base.Type)
 			}
 		}
 	}

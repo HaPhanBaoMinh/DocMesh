@@ -130,8 +130,8 @@ export function useGetDocument(docId: string) {
 	const [error, setError] = useState<string | null>(null);
 	const [document, setDocument] = useState<CreateDocumentResponse | null>(null);
 
-	const fetchDocument = useCallback(async () => {
-		if (!docId) return;
+	const fetchDocument = useCallback(async (docId?: string) => {
+		console.log('Fetching document with ID:', docId);
 
 		setIsLoading(true);
 		setError(null);
@@ -177,10 +177,6 @@ export function useGetDocument(docId: string) {
 		return null;
 	}, [docId]);
 
-
-	useEffect(() => {
-		fetchDocument();
-	}, [fetchDocument]);
 
 	return {
 		document,
