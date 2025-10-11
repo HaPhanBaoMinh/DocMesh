@@ -23,7 +23,7 @@ func (hm *HubManager) GetHub(docID string) (*Hub, bool) {
 	return h, ok
 }
 
-func (hm *HubManager) GetOrCreateHub(docID string) *Hub {
+func (hm *HubManager) GetOrCreateHub(docID, docName string) *Hub {
 	// Lock for reading first (use RLock for read-only access)
 	hm.mu.RLock()
 	h, ok := hm.Hubs[docID]
@@ -44,7 +44,7 @@ func (hm *HubManager) GetOrCreateHub(docID string) *Hub {
 	}
 
 	// Create a new hub if it doesn't exist
-	newHub := NewHub(Document{ID: docID, Content: "", Version: 0})
+	newHub := NewHub(Document{ID: docID, Content: "", Version: 0, Name: docName})
 	hm.Hubs[docID] = newHub
 	go newHub.Run()
 	log.Printf("Created hub for document: %s", docID)

@@ -53,7 +53,7 @@ func (h *WebSocketHandler) WsEntryHandler(hm *model.HubManager) http.HandlerFunc
 		}
 
 		// Get or create hub
-		hub := hm.GetOrCreateHub(docID)
+		hub := hm.GetOrCreateHub(docID, "Untitled Document")
 		client := model.NewClient(clientID, conn, hub)
 		hub.AddClient(client)
 

@@ -101,7 +101,7 @@ func (dh *DocumentHandler) CreateDocumentHandler(hm *model.HubManager) http.Hand
 
 		doc := model.NewDocument(docID, req.Name, content, 0)
 		// Create hub for this document
-		hm.GetOrCreateHub(doc.ID)
+		hm.GetOrCreateHub(doc.ID, doc.Name)
 
 		log.Printf("Created hub for document: %s", doc.ID)
 
