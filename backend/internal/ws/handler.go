@@ -43,40 +43,25 @@ func (h *WebSocketHandler) WsEntryHandler(hm *model.HubManager) http.HandlerFunc
 			clientID = "anonymous"
 		}
 
-		log.Printf("📥 WebSocket request: docID=%s, clientID=%s", docID, clientID)
+		log.Printf("WebSocket request: docID=%s, clientID=%s", docID, clientID)
 
 		// Upgrade HTTP to WebSocket
 		conn, err := upgrader.Upgrade(w, r, nil)
 		if err != nil {
-			log.Printf("❌ Failed to upgrade: %v", err)
+			log.Printf("Failed to upgrade: %v", err)
 			return
 		}
 
-		log.Printf("✅ WebSocket upgraded successfully for %s", clientID)
-
 		// Get or create hub
 		hub := hm.GetOrCreateHub(docID)
+		client := model.NewClient(clientID, conn, hub)
+		hub.AddClient(client)
 
-		// For now, just keep connection open and log messages
-		go func() {
-			defer conn.Close()
-			for {
-				messageType, message, err := conn.ReadMessage()
-				if err != nil {
-					log.Printf("🔴 Client %s disconnected: %v", clientID, err)
-					break
-				}
-				log.Printf("📨 Message from %s: %s", clientID, string(message))
-
-				// Echo back for testing
-				err = conn.WriteMessage(messageType, message)
-				if err != nil {
-					log.Printf("❌ Write error: %v", err)
-					break
-				}
-			}
-		}()
-
+		// Start client read pump
+		go client.ReadPump()
+		// Start client write pump
+		go client.WritePump()
+		// Log connection
 		log.Printf("Client %s connected to hub for document %s", clientID, hub.Document.ID)
 	}
 }

@@ -100,10 +100,10 @@ func (dh *DocumentHandler) CreateDocumentHandler(hm *model.HubManager) http.Hand
 		}
 
 		doc := model.NewDocument(docID, req.Name, content, 0)
-		log.Printf("Created document: ID=%s, Name=%s", doc.ID, doc.Name)
-
 		// Create hub for this document
 		hm.GetOrCreateHub(doc.ID)
+
+		log.Printf("Created hub for document: %s", doc.ID)
 
 		// Prepare response matching frontend CreateDocumentResponse interface
 		response := struct {
