@@ -50,11 +50,8 @@ func (h *Hub) Run() {
 				continue
 			}
 
-			log.Printf("Message type: %s", base.Type)
 			switch base.Type {
 			case "operation":
-				log.Printf("Parsed base: %+v", base)
-
 				err := h.Document.ApplyDelta(*base.Delta)
 				if err != nil {
 					log.Printf("ApplyDelta failed: %v", err)
@@ -76,7 +73,6 @@ func (h *Hub) Run() {
 
 						select {
 						case c.Send <- payload:
-							log.Printf("📤 Sent update to client %s", c.ID)
 						default:
 							close(c.Send)
 							delete(h.Clients, c.ID)

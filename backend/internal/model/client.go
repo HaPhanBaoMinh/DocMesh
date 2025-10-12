@@ -52,7 +52,6 @@ func (c *Client) ReadPump() {
 			break
 		}
 		c.Hub.Broadcast <- message
-		log.Printf("📥 Received from %s: %s", c.ID, message)
 	}
 }
 
@@ -75,7 +74,6 @@ func (c *Client) WritePump() {
 			if err != nil {
 				return
 			}
-			log.Printf("📤 Sent to %s: %s", c.ID, message)
 		case <-ticker.C:
 			// Send ping
 			if err := c.Conn.WriteMessage(websocket.PingMessage, nil); err != nil {

@@ -1,19 +1,15 @@
-import { useState, useMemo } from "react";
+// src/views/EditorView.tsx
+import { useState, useMemo, useEffect } from "react";
 import Editor from "../Editor";
 import InfoBar from "../InfoBar";
 import { useWebSocket } from "../hooks/useWebSocket";
 import { useWebSocketUrl } from "../hooks/useApi";
 import { useBufferedOperation } from "../hooks/useBufferedOperation";
-
-interface Doc {
-	title: string;
-	type: "public" | "private";
-	password?: string;
-}
+import type { Document } from "../model/types";
 
 interface EditorViewProps {
 	docId: string;
-	doc: Doc;
+	doc: Document;
 	user: string;
 	text: string;
 	rev: number;
@@ -26,19 +22,33 @@ export default function EditorView({
 	doc,
 	user,
 	text,
-	rev,
+	rev: initialRev,
 	onTextChange,
 	onCopyLink,
 }: EditorViewProps) {
 	const [clientId] = useState(() => crypto.randomUUID());
+	const [rev, setRev] = useState(initialRev);
 	const { getWebSocketUrl } = useWebSocketUrl();
 
-	// Memoize wsUrl to prevent reconnections on re-renders
-	const wsUrl = useMemo(() =>
-		getWebSocketUrl(docId, clientId),
+	const wsUrl = useMemo(
+		() => getWebSocketUrl(docId, clientId),
 		[getWebSocketUrl, docId, clientId]
 	);
 
+	// Wire up OT buffer (returns handlers we must invoke on WS messages)
+	const {
+		onRemoteCommit,
+		onServerInit,
+	} = useBufferedOperation({
+		clientId,
+		rev,
+		setRev,
+		isConnected: false,          // will be updated after WS is ready
+		sendOperationTransaction: () => { }, // replace once WS is connected
+		onTextChange,
+	});
+
+	// WebSocket layer
 	const {
 		isConnected,
 		isConnecting,
@@ -46,53 +56,48 @@ export default function EditorView({
 		sendOperationTransaction,
 	} = useWebSocket({
 		url: wsUrl,
-		onMessage: (message) => {
+		onMessage: (message: any) => {
 			switch (message.type) {
-				case 'init':
-					// Initial document state from server
-					if (message.document) {
-						console.log('📄 Document loaded:', message.document);
-						onTextChange(message.document.content);
-					}
+				case "init": {
+					if (doc) onServerInit(doc.content, doc.version);
 					break;
-
-				case 'operation':
-					// Remote operation from another user
-					if (message.delta) {
-						console.log('✏️ Remote operation:', message.delta);
-						// TODO: Apply operation transformation here
-						// For now, just log it
-					}
+				}
+				case "operation": {
+					// DO NOT early-return for own ops. Let OT handle ACK vs remote.
+					const fromClientId = message.client?.id;
+					const delta = message.delta;
+					if (!delta) return;
+					onRemoteCommit(fromClientId, delta.version ?? 0, delta.ops);
 					break;
-
-				case 'cursor':
-					// Remote cursor update
-					if (message.cursor) {
-						console.log('👆 Cursor update:', message.cursor);
-						// TODO: Display other users' cursors
-					}
+				}
+				case "error": {
+					// no-op; UI already shows wsError from hook
 					break;
-
-				case 'error':
-					console.error('❌ Server error:', message.error);
-					break;
+				}
 			}
 		},
 		onOpen: () => {
-			console.log('✅ WebSocket connected to document:', docId);
+			// no-op
 		},
 		onClose: () => {
-			console.log('🔴 WebSocket disconnected');
+			// no-op
 		},
-		onError: (error) => {
-			console.error('❌ WebSocket error:', error);
+		onError: () => {
+			// no-op
 		},
 	});
 
-	// Use buffered operation hook
-	const { handleTextChange } = useBufferedOperation({
+	// useEffect(() => {
+	// 	if (doc.content) {
+	// 		onServerInit(doc.content, doc.version);
+	// 	}
+	// }, [doc.content, doc.version]);
+
+	// Recreate buffered ops hook with live WS sender + connection flag
+	const wired = useBufferedOperation({
 		clientId,
 		rev,
+		setRev,
 		isConnected,
 		sendOperationTransaction,
 		onTextChange,
@@ -101,9 +106,8 @@ export default function EditorView({
 	return (
 		<div className="flex flex-col h-screen">
 			<header className="flex items-center justify-between px-4 py-2 bg-gray-800 text-white">
-				<div className="font-semibold">{doc.title}</div>
+				<div className="font-semibold">{doc.name}</div>
 				<div className="flex items-center space-x-4">
-					{/* Connection Status */}
 					<div className="text-xs">
 						{isConnecting && <span className="text-yellow-300">⏳ Connecting...</span>}
 						{isConnected && <span className="text-green-300">🟢 Connected</span>}
@@ -121,8 +125,24 @@ export default function EditorView({
 				</div>
 			</header>
 
-			<InfoBar user={user} rev={rev} />
-			<Editor value={text} onChange={handleTextChange} />
+			<InfoBar
+				user={user}
+				rev={rev}
+				pendingCount={wired.pendingOpsRef.current.length}
+				connected={isConnected}
+			/>
+
+			<Editor value={text} onChange={wired.handleTextChange} />
+
+			<div className="p-2 border-t bg-gray-50 text-xs flex justify-between">
+				<button
+					onClick={wired.flushBuffer}
+					className="px-2 py-1 rounded bg-gray-200 hover:bg-gray-300"
+				>
+					Flush buffer
+				</button>
+				<span>Client: {clientId}</span>
+			</div>
 		</div>
 	);
 }

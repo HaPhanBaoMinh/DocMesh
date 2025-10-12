@@ -4,7 +4,8 @@ import EditorView from '../components/EditorView';
 import UserNameModal from '../components/UserNameModal';
 import LoadingScreen from '../components/LoadingScreen';
 import ErrorScreen from '../components/ErrorScreen';
-import { useGetDocument } from '../hooks/useApi';
+import { useGetDocument, useWebSocketUrl } from '../hooks/useApi';
+import type { Document } from '../model/types';
 
 interface LocationState {
 	userName?: string;
@@ -21,7 +22,9 @@ export default function DocumentPage() {
 	const state = location.state as LocationState;
 
 	// Fetch document from server
-	const { document, isLoading: isLoadingDoc, error: docError, refetch } = useGetDocument(docId || '');
+	const { document, isLoading: isLoadingDoc, error: docError, refetch } = useGetDocument(docId || '', (rev) => {
+		setRev(rev);
+	});
 
 	// Get data from location state or from fetched document
 	const [user, setUser] = useState<string | null>(state?.userName || null);
@@ -37,17 +40,17 @@ export default function DocumentPage() {
 		}
 	}, [document, docTitle]);
 
-	const doc = {
-		title: docTitle || "Untitled Document",
-		type: state?.docType || "public" as const,
-		password: state?.password,
+	const doc: Document = {
+		id: docId || '',
+		name: docTitle || (document ? document.name : 'Untitled Document'),
+		content: document ? document.content : '',
+		version: document ? document.version : 0,
 	};
 
 	const handleCopyLink = () => {
 		if (!docId) return;
 		const link = `${window.location.origin}/${docId}`;
 		navigator.clipboard.writeText(link);
-		alert("Link copied!");
 	};
 
 	const handleUserNameSubmit = (name: string) => {
@@ -61,6 +64,12 @@ export default function DocumentPage() {
 			setShowNameModal(true);
 		}
 	}, [user]);
+
+	useEffect(() => {
+		if (doc?.content && text === "") {
+			setText(doc.content);
+		}
+	}, [doc, text]);
 
 	// Redirect to home if no docId
 	useEffect(() => {

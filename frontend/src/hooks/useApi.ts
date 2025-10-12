@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback } from 'react';
 import type { CreateDocumentRequest, CreateDocumentResponse } from '../model/types';
 
 // API configuration
@@ -125,7 +125,7 @@ export function useApiConfig() {
 /**
  * Hook for getting document by ID
  */
-export function useGetDocument(docId: string) {
+export function useGetDocument(docId: string, setRev: (rev: number) => void) {
 	const [isLoading, setIsLoading] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 	const [document, setDocument] = useState<CreateDocumentResponse | null>(null);
@@ -159,6 +159,9 @@ export function useGetDocument(docId: string) {
 
 				const doc: CreateDocumentResponse = await response.json();
 				setDocument(doc);
+				if (setRev) {
+					setRev(doc.version);
+				}
 				return doc;
 			} catch (err) {
 				const errorMessage = err instanceof Error ? err.message : 'Failed to fetch document';
@@ -175,7 +178,7 @@ export function useGetDocument(docId: string) {
 		}
 
 		return null;
-	}, [docId]);
+	}, [docId, setRev]);
 
 
 	return {
